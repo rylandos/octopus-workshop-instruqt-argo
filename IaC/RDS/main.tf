@@ -1,193 +1,140 @@
-###############################################
-# FULLY AUTOMATED, RERUNNABLE RDS SQL Server
-# Password is EXPOSED intentionally using
-# nonsensitive() -> safe for your throwaway lab
-###############################################
-
 terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.0"
-    }
   }
 }
 
 provider "aws" {
-  region = "eu-west-2" # London
+  region = "eu-west-2"
 }
 
-###############################################
-# RANDOM VALUES TO AVOID ALL NAMING COLLISIONS
-###############################################
-
+# Generate unique suffix per environment
 resource "random_pet" "suffix" {
   length = 2
 }
 
-resource "random_string" "username" {
-  length  = 8
-  upper   = false
+resource "random_password" "password" {
+  length  = 16
   special = false
 }
 
-resource "random_password" "password" {
-  length           = 16
-  special          = true
-  override_special = "_%@#!"
-}
-
-###############################################
-# VPC WITH REQUIRED DNS SETTINGS
-###############################################
-
-resource "aws_vpc" "main" {
-  cidr_block           = "10.10.0.0/16"
+# ---------------------------------------------
+# VPC with DNS enabled (required for public RDS)
+# ---------------------------------------------
+resource "aws_vpc" "sql_vpc" {
+  cidr_block           = "10.1.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
 
   tags = {
-    Name = "vpc-${random_pet.suffix.id}"
+    Name = "sql-vpc-${random_pet.suffix.id}"
   }
 }
 
-###############################################
-# PUBLIC SUBNETS (IN 2 AZs)
-###############################################
-
-resource "aws_subnet" "subnet_a" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.10.1.0/24"
+resource "aws_subnet" "subnet_1" {
+  vpc_id                  = aws_vpc.sql_vpc.id
+  cidr_block              = "10.1.1.0/24"
   availability_zone       = "eu-west-2a"
   map_public_ip_on_launch = true
-
-  tags = {
-    Name = "subnet-a-${random_pet.suffix.id}"
-  }
 }
 
-resource "aws_subnet" "subnet_b" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.10.2.0/24"
+resource "aws_subnet" "subnet_2" {
+  vpc_id                  = aws_vpc.sql_vpc.id
+  cidr_block              = "10.1.2.0/24"
   availability_zone       = "eu-west-2b"
   map_public_ip_on_launch = true
-
-  tags = {
-    Name = "subnet-b-${random_pet.suffix.id}"
-  }
 }
 
-###############################################
-# INTERNET GATEWAY + ROUTES
-###############################################
-
 resource "aws_internet_gateway" "gw" {
-  vpc_id = aws_vpc.main.id
-
-  tags = {
-    Name = "igw-${random_pet.suffix.id}"
-  }
+  vpc_id = aws_vpc.sql_vpc.id
 }
 
 resource "aws_route_table" "rt" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.sql_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.gw.id
   }
-
-  tags = {
-    Name = "rt-${random_pet.suffix.id}"
-  }
 }
 
 resource "aws_route_table_association" "rt_a" {
-  subnet_id      = aws_subnet.subnet_a.id
+  subnet_id      = aws_subnet.subnet_1.id
   route_table_id = aws_route_table.rt.id
 }
 
 resource "aws_route_table_association" "rt_b" {
-  subnet_id      = aws_subnet.subnet_b.id
+  subnet_id      = aws_subnet.subnet_2.id
   route_table_id = aws_route_table.rt.id
 }
 
-###############################################
-# SECURITY GROUP – ALLOW SQL SERVER (1433)
-###############################################
+# -----------------------------------------------------
+# Security Group (Public inbound allowed temporarily)
+# -----------------------------------------------------
+resource "aws_security_group" "rds_sg" {
+  name        = "rds-sg-${random_pet.suffix.id}"
+  description = "Temporary public access for demo"
 
-resource "aws_security_group" "sql_sg" {
-  name        = "sql-sg-${random_pet.suffix.id}"
-  description = "Allow SQL Server access"
-  vpc_id      = aws_vpc.main.id
+  vpc_id = aws_vpc.sql_vpc.id
 
   ingress {
+    description = "SQL Server"
+    protocol    = "tcp"
     from_port   = 1433
     to_port     = 1433
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Fully open for lab
+    cidr_blocks = ["0.0.0.0/0"]  # <= OPEN ACCESS FOR NOW
   }
 
   egress {
+    protocol    = "-1"
     from_port   = 0
     to_port     = 0
-    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "sg-${random_pet.suffix.id}"
   }
 }
 
-###############################################
-# RDS SUBNET GROUP (RANDOMIZED NAME)
-###############################################
-
+# -----------------------------------------------------
+# Subnet Group
+# -----------------------------------------------------
 resource "aws_db_subnet_group" "sql_subnets" {
-  name       = "rds-subnet-${random_pet.suffix.id}"
+  name       = "sql-subnets-${random_pet.suffix.id}"
   subnet_ids = [
-    aws_subnet.subnet_a.id,
-    aws_subnet.subnet_b.id
+    aws_subnet.subnet_1.id,
+    aws_subnet.subnet_2.id
   ]
 
   tags = {
-    Name = "rds-subnet-${random_pet.suffix.id}"
+    Name = "sql-subnets-${random_pet.suffix.id}"
   }
 }
 
-###############################################
-# RDS SQL SERVER EXPRESS (FREE TIER)
-###############################################
-
+# -----------------------------------------------------
+# RDS SQL Server Free Tier
+# -----------------------------------------------------
 resource "aws_db_instance" "sqlserver" {
-  identifier               = "sql-${random_pet.suffix.id}"
-  engine                   = "sqlserver-ex"
-  instance_class           = "db.t3.micro"
-  allocated_storage        = 20
-
-  username = random_string.username.result
-  password = random_password.password.result
-
-  db_subnet_group_name   = aws_db_subnet_group.sql_subnets.name
-  vpc_security_group_ids = [aws_security_group.sql_sg.id]
-
-  publicly_accessible = true
-  skip_final_snapshot = true
+  identifier              = "sql-${random_pet.suffix.id}"
+  allocated_storage       = 20
+  engine                  = "sqlserver-ex"
+  instance_class          = "db.t3.micro"
+  username                = "admin${random_pet.suffix.id}"
+  password                = random_password.password.result
+  db_subnet_group_name    = aws_db_subnet_group.sql_subnets.name
+  vpc_security_group_ids  = [aws_security_group.rds_sg.id]
+  publicly_accessible     = true
+  skip_final_snapshot     = true
+  port                    = 1433
 
   tags = {
     Name = "sql-${random_pet.suffix.id}"
   }
 }
 
-###############################################
-# NON-SENSITIVE OUTPUTS ⚠️ PASSWORD EXPOSED
-###############################################
-
+# -----------------------------------------------------
+# Outputs
+# -----------------------------------------------------
 output "rds_host" {
   value = aws_db_instance.sqlserver.address
 }
@@ -197,10 +144,9 @@ output "rds_port" {
 }
 
 output "username" {
-  value = random_string.username.result
+  value = aws_db_instance.sqlserver.username
 }
 
-# THE FIX — nonsensitive() allows Terraform to output the password
 output "password" {
   value     = nonsensitive(random_password.password.result)
   sensitive = false

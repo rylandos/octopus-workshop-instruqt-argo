@@ -67,7 +67,7 @@ step "apply-a-terraform-template" {
 
         container {
             feed = "#{parameter.container.feed}"
-            image = "octopusdeploy/worker-tools:6.5.0-ubuntu.22.04"
+            image = "octopusdeploylabs/terraform-workertools:1.14.1"
         }
 
         git_dependencies {

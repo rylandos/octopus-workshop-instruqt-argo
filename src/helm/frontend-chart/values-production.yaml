@@ -1,5 +1,4 @@
 replicaCount: 1
-replicaCount: 1
 
 image:
   repository: ghcr.io/{CHANGE_ME}/octopus-workshop-instruqt-argo/sample.frontend

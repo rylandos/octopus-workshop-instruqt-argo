@@ -5,7 +5,7 @@ process_template "run-a-process-template" {
 
     package_parameter "parameter.database.package" {
         feed = "octopus-server-built-in"
-        package_id = "rylandos/octopus-workshop-instruqt-argo"
+        package_id = "sample.database"
     }
 
     parameter "parameter.worker.pool" {

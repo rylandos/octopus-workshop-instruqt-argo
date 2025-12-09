@@ -10,4 +10,30 @@ run_retention_policy {
     type = "Default"
 }
 
-process {}
+process {
+    process_template "run-a-process-template" {
+        name = "Run a Process Template"
+        process_template_slug = "terraoform-aws-infrastructure"
+        version_mask = "3.X"
+
+        parameter "parameter.aws.account" {
+            value = "AWS.Account"
+        }
+
+        parameter "parameter.worker.pool" {
+            value = "WorkerPools-124"
+        }
+
+        parameter "parameter.respositry.url" {
+            value = "https://github.com/rylandos/octopus-workshop-instruqt-argo"
+        }
+
+        parameter "parameter.template.directory" {
+            value = "IaC/RDS"
+        }
+
+        parameter "parameter.container.feed" {
+            value = "Feeds-1117"
+        }
+    }
+}

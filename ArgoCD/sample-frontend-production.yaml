@@ -12,7 +12,7 @@ spec:
     server: https://kubernetes.default.svc
   source:
     path: src/helm/frontend-chart
-    repoURL: https://github.com/{CHANGE_ME}/octopus-workshop-instruqt-argo.git
+    repoURL: https://github.com/rylandos/octopus-workshop-instruqt-argo.git
     targetRevision: HEAD
     helm:
       valueFiles:

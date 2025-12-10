@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sample-frontend-test
+  annotations:
+    argo.octopus.com/project: "sample-frontend"
+    argo.octopus.com/environment: "test"
+    argo.octopus.com/image-replace-paths: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+spec:
+  destination:
+    namespace: sample-frontend-test
+    server: https://kubernetes.default.svc
+  source:
+    path: src/helm/frontend-chart
+    repoURL: https://github.com/{CHANGE_ME}/octopus-workshop-instruqt-argo.git
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - values-test.yaml
+  sources: []
+  project: default
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
+      enabled: true
+    syncOptions:
+      - CreateNamespace=true

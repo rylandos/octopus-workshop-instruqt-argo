@@ -6,36 +6,46 @@ on:
 jobs:
   build-frontend:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
+      id-token: write
+
+    env:
+      IMAGE_NAME: sample.frontend
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Compute version YY.1.<run>
       - name: Determine version
+        id: version
         run: |
           YEAR=$(date +'%y')
-          VERSION="${YEAR}.1.${{ github.run_number }}"
+          VERSION="${YEAR}.4.${{ github.run_number }}"
           echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Compute GHCR owner
+      # Compute GHCR namespace and repo correctly
+      - name: Compute GHCR namespace + repo path
         run: |
-          SLUG=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "GHCR_OWNER_SLUG=$SLUG" >> $GITHUB_ENV
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          echo "GHCR_OWNER=$OWNER" >> $GITHUB_ENV
+          echo "GHCR_REPO=$REPO_NAME" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Push Frontend
+      - name: Build & Push Frontend Image
         uses: docker/build-push-action@v6
         with:
           context: src/Frontend
@@ -43,7 +53,5 @@ jobs:
           push: true
           provenance: false
           sbom: false
-          outputs: type=registry,oci-mediatypes=false
           tags: |
-            ghcr.io/${{ env.GHCR_OWNER_SLUG }}/sample.frontend:${{ env.RELEASE_VERSION }}
-            ghcr.io/${{ env.GHCR_OWNER_SLUG }}/sample.frontend:latest
+            ghcr.io/${{ env.GHCR_OWNER }}/${{ env.GHCR_REPO }}/sample.frontend:${{ env.RELEASE_VERSION }}

@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/{CHANGE_ME}/octopus-workshop-instruqt-argo/sample.frontend
+  repository: ghcr.io/rylandos/octopus-workshop-instruqt-argo/sample.frontend
   tag: 25.1.3
   pullPolicy: IfNotPresent
 
